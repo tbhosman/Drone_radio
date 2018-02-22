@@ -2,6 +2,8 @@
 #include <SPI.h> // Includes SPI libary (port 10, 11, 12, 13)
 #include "nRF24L01.h"
 #include "RF24.h"
+#include <Wire.h> 
+#include <LiquidCrystal_I2C.h>
 
 /* 
 SPI: 1) Data from master to slave (Mosi) 
@@ -42,17 +44,34 @@ const int pinThrottle = A3;
 const int pinRoll = A0;
 const int pinPitch = A1;
 const int pinYaw = A2;
+const int pinBattery = A7;
 //const int pinSwitch1 = 8;
 //const int pinSwitch2 = 7;
 
 const uint16_t rollOffset = 0;
 const uint16_t pitchOffset = 0;
 const uint16_t yawOffset = 0;
+const uint16_t throttleOffset = 0;
 
 bool success;
 
 uint16_t payload[PAYLOAD_SIZE];
 uint8_t acknowledgePayload[4];
+
+#include <LiquidCrystal_I2C.h>
+
+// Set display pins
+#define I2C_ADDR    0x3F // <<----- Add your address here.  Find it from I2C Scanner
+#define BACKLIGHT_PIN     3
+#define En_pin  2
+#define Rw_pin  1
+#define Rs_pin  0
+#define D4_pin  4
+#define D5_pin  5
+#define D6_pin  6
+#define D7_pin  7
+
+LiquidCrystal_I2C	lcd(I2C_ADDR,En_pin,Rw_pin,Rs_pin,D4_pin,D5_pin,D6_pin,D7_pin);
 
 void startRadio(void)
 {
@@ -69,7 +88,49 @@ void startRadio(void)
 
 void startScreen(void)
 {
+  lcd.begin(20,4);  
+  lcd.setBacklightPin(BACKLIGHT_PIN,POSITIVE);
+  lcd.setBacklight(HIGH);
+  lcd.home(); // go home
+  lcd.print("Battery tx:     V"); //location 12-15 can be used for 4 voltage digits
+  lcd.setCursor ( 0, 1 );         // go to the 2nd line
+  lcd.print("Battery QC:     V"); //location 12-15 can be used for 4 voltage digits
+  lcd.setCursor ( 0, 2 );         // go to the 3rd line
+  lcd.print("T:      R: ");
+  lcd.setCursor ( 0, 3 );         // go to the 4th line
+  lcd.print("P:      Y: ");
 
+}
+
+void updateScreen(void)
+{
+  // Display battery level
+  double Batterylevel = (double)(analogRead(pinBattery)*(5.0/1024.0)*(119.0/51.0)*1.01); //in mV
+  lcd.setCursor(11,0);
+  if (Batterylevel<10.0) {
+    lcd.print(" " + (String) Batterylevel);
+  } else {
+    lcd.print((String) Batterylevel);
+  }
+
+  // Display TRPY data
+  for (int i=0; i<4; i++){
+    
+    //set cursor position
+    if (i==0) lcd.setCursor(3,2);       //throttle position
+    else if (i==1) lcd.setCursor(11,2); //roll position
+    else if (i==2) lcd.setCursor(3,3);  //pitch position
+    else lcd.setCursor(11,3);           //yaw position
+
+    //set value
+    if (payload[i]>1000) {
+      lcd.print((String) payload[i] + " ");
+    } else if(payload[i]>100) {
+      lcd.print(" " + (String) payload[i] + " ");
+    } else {
+      lcd.print("  " + (String) payload[i] + " ");
+    }
+  }
 }
 
 uint8_t movingAvg(uint8_t *ptrArrNumbers, uint16_t *ptrSum, uint8_t pos, uint16_t len, uint8_t nextNum)
@@ -92,7 +153,7 @@ void setup(void)
   //pinMode(pinSwitch2, INPUT_PULLUP);
 
   // Start screen
-  // startScreen();
+  startScreen();
 
   // Configure the transceiver
   startRadio();
@@ -141,11 +202,10 @@ void loop(void)
 {
 
 #ifdef DEBUG__
-  payload[0] = 1080-((uint16_t)analogRead(pinThrottle)*5/3);
-  payload[1] = (uint16_t)analogRead(pinRoll) - rollOffset;
-  payload[2] = (uint16_t)analogRead(pinPitch) - pitchOffset;
-  payload[3] = (uint16_t)analogRead(pinYaw) - yawOffset;
-  Serial.println(payload[0]);
+  payload[0] = 1024 - ((uint16_t)analogRead(pinThrottle)) - throttleOffset;
+  payload[1] = 1024 - (uint16_t)analogRead(pinRoll) - rollOffset;
+  payload[2] = 1024 - (uint16_t)analogRead(pinPitch) - pitchOffset;
+  payload[3] = 1024 - (uint16_t)analogRead(pinYaw) - yawOffset;
   //payload[4] = (uint16_t)(!digitalRead(pinSwitch2) & 0x01) << 1 | (!digitalRead(pinSwitch2) & 0x01); // inverted due to pullup resistor
   success = radio.write(&payload, PAYLOAD_SIZE);
   if (radio.isAckPayloadAvailable())
@@ -161,15 +221,16 @@ void loop(void)
   signalStrength = movingAvg(signalStrengthArray, &sum, pos, sizeof(signalStrengthArray), packetReceived);
   pos++;
 
+  if (pos==1) updateScreen(); //only update screen every 256 cycles
+
   // Serial.println(signalStrength);
   // Serial.print("\t");
-  // Serial.print(analogRead(pinThrottle));
-  // Serial.print("\t");
-  // Serial.print((int16_t)(analogRead(pinRoll) - rollOffset));
-  // Serial.print("\t");
-  // Serial.print((int16_t)(analogRead(pinYaw) - yawOffset));
-  // Serial.print("\t");
-  // Serial.println((int16_t)(analogRead(pinPitch) - pitchOffset)); //acknowledgePayload[1] <<8 | acknowledgePayload[0]);
-
+  //  Serial.print(analogRead(pinThrottle));
+  //  Serial.print("\t");
+  //  Serial.print((int16_t)(analogRead(pinRoll) - rollOffset));
+  //  Serial.print("\t");
+  //  Serial.print((int16_t)(analogRead(pinYaw) - yawOffset));
+  //  Serial.print("\t");
+  //  Serial.println((int16_t)(analogRead(pinPitch) - pitchOffset)); //acknowledgePayload[1] <<8 | acknowledgePayload[0]);
 #endif
 }
