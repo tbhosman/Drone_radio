@@ -123,9 +123,9 @@ void updateScreen(void)
     else lcd.setCursor(11,3);           //yaw position
 
     //set value
-    if (payload[i]>1000) {
+    if (payload[i]>=1000) {
       lcd.print((String) payload[i] + " ");
-    } else if(payload[i]>100) {
+    } else if(payload[i]>=100) {
       lcd.print(" " + (String) payload[i] + " ");
     } else {
       lcd.print("  " + (String) payload[i] + " ");
