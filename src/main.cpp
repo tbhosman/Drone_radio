@@ -53,6 +53,21 @@ const uint16_t pitchOffset = 0;
 const uint16_t yawOffset = 0;
 const uint16_t throttleOffset = 0;
 
+// Border ADC values of sticks
+const uint16_t throttleMin = 28;
+const uint16_t throttleMax = 912;
+const uint16_t rollMin = 22;
+const uint16_t rollMax = 925;
+const uint16_t pitchMin = 108;
+const uint16_t pitchMax = 1004;
+const uint16_t yawMin = 55;
+const uint16_t yawMax = 989;
+
+// Dead area of minimum and maximum stick values
+const uint16_t rangeMarginMin = 20;
+const uint16_t rangeMarginMax = 20;
+
+
 bool success;
 
 uint16_t payload[PAYLOAD_SIZE];
@@ -143,6 +158,45 @@ uint8_t movingAvg(uint8_t *ptrArrNumbers, uint16_t *ptrSum, uint8_t pos, uint16_
   return *ptrSum / len;
 }
 
+/* To avoid offsets and lack of range, all stick values are scaled to fit between 0 and 1024.
+   E.g for throttle, everything (throttleMin + rangeMarginMin) and (throttleMax - rangeMarginMax) 
+   is scaled between 0 and 1024. Everything outside this range is ignored.
+*/
+
+uint16_t fetchStickValue(String stick){
+
+    uint16_t rawValue = 0;
+    uint16_t minBorder = 0;
+    uint16_t maxBorder = 0;
+
+  if (stick=="throttle"){
+    rawValue = (uint16_t)analogRead(pinThrottle);
+    minBorder = throttleMin + rangeMarginMin;
+    maxBorder = throttleMax - rangeMarginMax;
+  }
+  else if (stick=="roll"){
+    rawValue = (uint16_t)analogRead(pinRoll);
+    minBorder = rollMin + rangeMarginMin;
+    maxBorder = rollMax - rangeMarginMax;
+  }
+  else if (stick=="pitch"){
+    rawValue = (uint16_t)analogRead(pinPitch);
+    minBorder = pitchMin + rangeMarginMin;
+    maxBorder = pitchMax - rangeMarginMax;
+  }
+  else if (stick=="yaw"){
+    rawValue = (uint16_t)analogRead(pinYaw);
+    minBorder = yawMin + rangeMarginMin;
+    maxBorder = yawMax - rangeMarginMax;
+  } else return 0;
+  
+  if (rawValue < minBorder) return 1024;  // invert value
+  if (rawValue > maxBorder) return 0;     // invert value
+  double slope = 1024.0/((double)(maxBorder-minBorder));
+  return 1024-slope*(rawValue-minBorder);
+
+}
+
 void setup(void)
 {
 #ifdef DEBUG__
@@ -175,10 +229,10 @@ ISR(TIMER2_COMPA_vect)
 {
   TCNT2 = TIMERCOUNTERVALUE_500HZ;
 
-  payload[0] = (uint16_t)analogRead(pinThrottle);
-  payload[1] = (uint16_t)analogRead(pinRoll) - rollOffset;
-  payload[2] = (uint16_t)analogRead(pinPitch) - pitchOffset;
-  payload[3] = (uint16_t)analogRead(pinYaw) - yawOffset;
+  payload[0] = fetchStickValue("throttle");
+  payload[1] = fetchStickValue("roll");
+  payload[2] = fetchStickValue("pitch");
+  payload[3] = fetchStickValue("yaw");
   //payload[4] = (uint16_t)(!digitalRead(pinSwitch2) & 0x01) << 1 | (!digitalRead(pinSwitch2) & 0x01); // inverted due to pullup resistor
 
   success = radio.write(&payload, PAYLOAD_SIZE);
@@ -202,10 +256,10 @@ void loop(void)
 {
 
 #ifdef DEBUG__
-  payload[0] = 1024 - ((uint16_t)analogRead(pinThrottle)) - throttleOffset;
-  payload[1] = 1024 - (uint16_t)analogRead(pinRoll) - rollOffset;
-  payload[2] = 1024 - (uint16_t)analogRead(pinPitch) - pitchOffset;
-  payload[3] = 1024 - (uint16_t)analogRead(pinYaw) - yawOffset;
+  payload[0] = fetchStickValue("throttle");
+  payload[1] = fetchStickValue("roll");
+  payload[2] = fetchStickValue("pitch");
+  payload[3] = fetchStickValue("yaw");
   //payload[4] = (uint16_t)(!digitalRead(pinSwitch2) & 0x01) << 1 | (!digitalRead(pinSwitch2) & 0x01); // inverted due to pullup resistor
   success = radio.write(&payload, PAYLOAD_SIZE);
   if (radio.isAckPayloadAvailable())
@@ -223,14 +277,5 @@ void loop(void)
 
   if (pos==1) updateScreen(); //only update screen every 256 cycles
 
-  // Serial.println(signalStrength);
-  // Serial.print("\t");
-  //  Serial.print(analogRead(pinThrottle));
-  //  Serial.print("\t");
-  //  Serial.print((int16_t)(analogRead(pinRoll) - rollOffset));
-  //  Serial.print("\t");
-  //  Serial.print((int16_t)(analogRead(pinYaw) - yawOffset));
-  //  Serial.print("\t");
-  //  Serial.println((int16_t)(analogRead(pinPitch) - pitchOffset)); //acknowledgePayload[1] <<8 | acknowledgePayload[0]);
 #endif
 }
