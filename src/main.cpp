@@ -80,7 +80,7 @@ uint8_t acknowledgePayload[4];
 #include <LiquidCrystal_I2C.h>
 
 // Set display pins
-#define I2C_ADDR    0x3F // <<----- Add your address here.  Find it from I2C Scanner
+#define I2C_ADDR    0x3F
 #define BACKLIGHT_PIN     3
 #define En_pin  2
 #define Rw_pin  1
@@ -145,7 +145,7 @@ void updateScreen(void)
   } else if (!screenPowered) lcd.on();
 
   // Display drone battery level
-  double batteryLevelQC = (double)(rxBatteryLevel*(3.3/1024.0)*(267.1/46.8)); //in mV
+  double batteryLevelQC = (double)(rxBatteryLevel*(3.3/1024.0)*(267.1/46.8)*4.18); //in mV
   lcd.setCursor(11,1);
   if (batteryLevelQC<10.0) {
     lcd.print(" " + (String) batteryLevelQC);
@@ -265,7 +265,7 @@ ISR(TIMER2_COMPA_vect)
   if (radio.isAckPayloadAvailable())
   {
     success = radio.read(&acknowledgePayload, 4);
-    rxBatteryLevel = acknowledgePayload[1];
+    rxBatteryLevel = acknowledgePayload[0];
     packetReceived = 100;
   }
   else
@@ -291,6 +291,7 @@ void loop(void)
   if (radio.isAckPayloadAvailable())
   {
     success = radio.read(&acknowledgePayload, 4);
+    rxBatteryLevel = acknowledgePayload[0];
     packetReceived = 100;
     // digitalWrite(pinSwitch1,LOW);
   }
