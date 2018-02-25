@@ -70,6 +70,8 @@ const uint16_t rangeMarginMax = 20;
 const double batteryTxCritical = 9.6;
 bool screenPowered = true;
 
+enum stickType {throttle, roll, pitch, yaw};
+
 bool success;
 
 uint16_t payload[PAYLOAD_SIZE];
@@ -186,28 +188,28 @@ uint8_t movingAvg(uint8_t *ptrArrNumbers, uint16_t *ptrSum, uint8_t pos, uint16_
    is scaled between 0 and 1024. Everything outside this range is ignored.
 */
 
-uint16_t fetchStickValue(String stick){
+uint16_t fetchStickValue(stickType stick){
 
     uint16_t rawValue = 0;
     uint16_t minBorder = 0;
     uint16_t maxBorder = 0;
 
-  if (stick=="throttle"){
+  if (stick==throttle){
     rawValue = (uint16_t)analogRead(pinThrottle);
     minBorder = throttleMin + rangeMarginMin;
     maxBorder = throttleMax - rangeMarginMax;
   }
-  else if (stick=="roll"){
+  else if (stick==roll){
     rawValue = (uint16_t)analogRead(pinRoll);
     minBorder = rollMin + rangeMarginMin;
     maxBorder = rollMax - rangeMarginMax;
   }
-  else if (stick=="pitch"){
+  else if (stick==pitch){
     rawValue = (uint16_t)analogRead(pinPitch);
     minBorder = pitchMin + rangeMarginMin;
     maxBorder = pitchMax - rangeMarginMax;
   }
-  else if (stick=="yaw"){
+  else if (stick==yaw){
     rawValue = (uint16_t)analogRead(pinYaw);
     minBorder = yawMin + rangeMarginMin;
     maxBorder = yawMax - rangeMarginMax;
@@ -252,10 +254,10 @@ ISR(TIMER2_COMPA_vect)
 {
   TCNT2 = TIMERCOUNTERVALUE_500HZ;
 
-  payload[0] = fetchStickValue("throttle");
-  payload[1] = fetchStickValue("roll");
-  payload[2] = fetchStickValue("pitch");
-  payload[3] = fetchStickValue("yaw");
+  payload[0] = fetchStickValue(throttle);
+  payload[1] = fetchStickValue(roll);
+  payload[2] = fetchStickValue(pitch);
+  payload[3] = fetchStickValue(yaw);
   //payload[4] = (uint16_t)(!digitalRead(pinSwitch2) & 0x01) << 1 | (!digitalRead(pinSwitch2) & 0x01); // inverted due to pullup resistor
 
   success = radio.write(&payload, PAYLOAD_SIZE);
@@ -280,10 +282,10 @@ void loop(void)
 {
 
 #ifdef DEBUG__
-  payload[0] = fetchStickValue("throttle");
-  payload[1] = fetchStickValue("roll");
-  payload[2] = fetchStickValue("pitch");
-  payload[3] = fetchStickValue("yaw");
+  payload[0] = fetchStickValue(throttle);
+  payload[1] = fetchStickValue(roll);
+  payload[2] = fetchStickValue(pitch);
+  payload[3] = fetchStickValue(yaw);
   //payload[4] = (uint16_t)(!digitalRead(pinSwitch2) & 0x01) << 1 | (!digitalRead(pinSwitch2) & 0x01); // inverted due to pullup resistor
   success = radio.write(&payload, PAYLOAD_SIZE);
   if (radio.isAckPayloadAvailable())
