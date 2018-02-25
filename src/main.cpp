@@ -67,6 +67,8 @@ const uint16_t yawMax = 989;
 const uint16_t rangeMarginMin = 20;
 const uint16_t rangeMarginMax = 20;
 
+const double batteryTxCritical = 9.6;
+bool screenPowered = true;
 
 bool success;
 
@@ -119,13 +121,34 @@ void startScreen(void)
 
 void updateScreen(void)
 {
-  // Display battery level
-  double Batterylevel = (double)(analogRead(pinBattery)*(5.0/1024.0)*(119.0/51.0)*1.01); //in mV
+  // Display transmitter battery level
+  double batteryLevelTx = (double)(analogRead(pinBattery)*(5.0/1024.0)*(119.0/51.0)*1.01); //in mV
   lcd.setCursor(11,0);
-  if (Batterylevel<10.0) {
-    lcd.print(" " + (String) Batterylevel);
+  if (batteryLevelTx<10.0) {
+    lcd.print(" " + (String) batteryLevelTx);
   } else {
-    lcd.print((String) Batterylevel);
+    lcd.print((String) batteryLevelTx);
+  }
+
+  // Start blinking screen when battery is low
+  if (batteryLevelTx<batteryTxCritical){
+    if (screenPowered) {
+      lcd.off();
+      screenPowered = false;
+      }
+    else {
+      lcd.on();
+      screenPowered = true;
+    } 
+  } else if (!screenPowered) lcd.on();
+
+  // Display drone battery level
+  double batteryLevelQC = (double)(rxBatteryLevel*(3.3/1024.0)*(267.1/46.8)); //in mV
+  lcd.setCursor(11,1);
+  if (batteryLevelQC<10.0) {
+    lcd.print(" " + (String) batteryLevelQC);
+  } else {
+    lcd.print((String) batteryLevelQC);
   }
 
   // Display TRPY data
@@ -250,6 +273,7 @@ ISR(TIMER2_COMPA_vect)
 
   signalStrength = movingAvg(signalStrengthArray, &sum, pos, sizeof(signalStrengthArray), packetReceived);
   pos++;
+  
 }
 
 void loop(void)
